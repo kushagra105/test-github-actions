@@ -45,8 +45,10 @@ jobs:
         user: 'deploy'
         ssh_private_key: '${{ secrets.GCP_SSH_PRIVATE_KEY }}'
         command: |-
+          docker rm -f  express_app
           docker pull gcr.io/${{env.PROJECT_ID}}/${{env.IMAGE_NAME}}:latest
-          docker run -d -ti --restart=always -p 3000:3000 gcr.io/${{env.PROJECT_ID}}/${{env.IMAGE_NAME}}:latest
+          docker run -it -d -p 3000:3000 --name express_app gcr.io/saraswati-schoolapplication/test_express:latest
+          docker images -a | grep none | awk '{ print $3; }' | xargs docker rmi
 
     # Example of using the output
     - id: 'get_output'
