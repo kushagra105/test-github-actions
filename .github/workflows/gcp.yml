@@ -45,7 +45,7 @@ jobs:
         user: 'deploy'
         ssh_private_key: '${{ secrets.GCP_SSH_PRIVATE_KEY }}'
         command: |-
-          docker pull gcr.io/$PROJECT_ID/$IMAGE_NAME:latest
+          docker pull gcr.io/'${{env.PROJECT_ID}}'/'${{env.IMAGE_NAME}}':latest
 
     # Example of using the output
     - id: 'get_output'
