@@ -44,7 +44,7 @@ jobs:
         zone: 'us-central1-a'
         user: 'deploy'
         ssh_private_key: '${{ secrets.GCP_SSH_PRIVATE_KEY }}'
-        run: |-
+        command: |-
           docker pull gcr.io/$PROJECT_ID/$IMAGE_NAME:latest
 
     # Example of using the output
