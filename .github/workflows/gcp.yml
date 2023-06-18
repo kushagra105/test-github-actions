@@ -38,7 +38,7 @@ jobs:
     
     
     - name: Delete un-used Images
-      run: sh ./housekeeping_images.sh gcr.io/$PROJECT_ID/$IMAGE_NAME 5  
+      run: sh ./housekeeping_images.sh gcr.io/${{env.PROJECT_ID}}/${{env.IMAGE_NAME}} 5  
     
     - id: 'compute-ssh'
       uses: 'google-github-actions/ssh-compute@v0'
