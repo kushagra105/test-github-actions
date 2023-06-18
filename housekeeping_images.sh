@@ -1,40 +1,44 @@
-IFS=$'\n\t'
-set -eou pipefail
+#!/usr/bin/env bash
 
-if [[ "$#" -ne 2 || "${1}" == '-h' || "${1}" == '--help' ]]; then
-	cat >&2 <<"EOF"
-housekeeping_images.sh cleans up tagged or untagged images pushed for a given repository (an image name without a tag/digest)
-and except the given number most recent images
-USAGE:
-  housekeeping_images.sh REPOSITORY NUMBER_OF_IMAGES_TO_REMAIN
-EXAMPLE
-  housekeeping_images.sh eu.gcr.io/YOUR_PROJECT/IMAGE_NAME 5
-  would clean up everything under the eu.gcr.io/test-project/php repository
-  pushed except for the 5 most recent images
-EOF
-	exit 1
-# elif [ ${2} -ge 0 ] 2>/dev/null; then
-#     echo "no number of images to remain given" >&2
-#     exit 1
-fi
+RED='\033[0;31m'
+YELL='\033[1;33m'
+NC='\033[0m' # No Color
 
-main() {
-	local C=0
-	IMAGE="${1}"
-	NUMBER_OF_IMAGES_TO_REMAIN=$((${2} - 1))
+IMAGES_TO_KEEP="5"
+IMAGE_REPO="gcr.io/saraswati-schoolapplication"
 
-	DATE=$(gcloud container images list-tags $IMAGE --limit=unlimited \
-		--sort-by=~TIMESTAMP --format=json | TZ=/usr/share/zoneinfo/UTC jq -r '.['$NUMBER_OF_IMAGES_TO_REMAIN'].timestamp.datetime | sub("(?<before>.*):"; .before ) | strptime("%Y-%m-%d %H:%M:%S%z") | mktime | strftime("%Y-%m-%d")')
+# Get all images at the given image repo
+echo -e "${YELL}Getting all images${NC}"
+IMAGELIST=$(gcloud container images list --repository=${IMAGE_REPO} --format='get(name)')
+echo "$IMAGELIST"
 
-	for digest in $(gcloud container images list-tags $IMAGE --limit=unlimited --sort-by=~TIMESTAMP \
-		--filter="timestamp.datetime < '${DATE}'" --format='get(digest)'); do
-		(
-			set -x
-			gcloud container images delete -q --force-delete-tags "${IMAGE}@${digest}"
-		)
-		let C=C+1
-	done
-	echo "Deleted ${C} images in ${IMAGE}." >&2
-}
+while IFS= read -r IMAGENAME; do
+  IMAGENAME=$(echo $IMAGENAME|tr -d '\r')
+  echo -e "${YELL}Checking ${IMAGENAME} for cleanup requirements${NC}"
 
-main "${1}" ${2}
+  # Get all the digests for the tag ordered by timestamp (oldest first)
+  DIGESTLIST=$(gcloud container images list-tags ${IMAGENAME} --sort-by timestamp --format='get(digest)')
+  DIGESTLISTCOUNT=$(echo "${DIGESTLIST}" | wc -l)
+
+  if [ ${IMAGES_TO_KEEP} -ge "${DIGESTLISTCOUNT}" ]; then
+    echo -e "${YELL}Found ${DIGESTLISTCOUNT} digests, nothing to delete${NC}"
+    continue
+  fi
+
+  # Filter the ordered list to remove the most recent 3
+  DIGESTLISTTOREMOVE=$(echo "${DIGESTLIST}" | head -n -${IMAGES_TO_KEEP})
+  DIGESTLISTTOREMOVECOUNT=$(echo "${DIGESTLISTTOREMOVE}" | wc -l)
+
+  echo -e "${YELL}Found ${DIGESTLISTCOUNT} digests, ${DIGESTLISTTOREMOVECOUNT} to delete${NC}"
+
+  # Do deletion or say nothing to do
+  if [ "${DIGESTLISTTOREMOVECOUNT}" -gt "0" ]; then
+    echo -e "${YELL}Removing ${DIGESTLISTTOREMOVECOUNT} digests${NC}"
+    while IFS= read -r LINE; do
+      LINE=$(echo $LINE|tr -d '\r')
+        gcloud container images delete ${IMAGENAME}@${LINE} --force-delete-tags --quiet
+    done <<< "${DIGESTLISTTOREMOVE}"
+  else
+    echo -e "${YELL}No digests to remove${NC}"
+  fi
+done <<< "${IMAGELIST}"
