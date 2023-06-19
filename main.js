@@ -5,7 +5,7 @@ const app = express();
 
 // Define a route
 app.get('/', (req, res) => {
-  res.send('Hello, world! Testing from Github after halki permissions #5');
+  res.send('Hello, world! Testing from Github Actions #1');
 });
 
 // Start the server
